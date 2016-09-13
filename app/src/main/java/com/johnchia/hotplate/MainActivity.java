@@ -1,5 +1,16 @@
 package com.johnchia.hotplate;
 
+/* So this is one ugly hack of a project, but it could still be extended a *bit* futher.  Options:
+    1. configurable timeouts
+    2. make it hotter
+    3. ensure all tasks are cancelled before shutdown
+    4. selectable burntask types (e.g. simple sqrt(rand), matrix mult, prime factoring, etc)
+    5. built-in CPU temperature monitoring
+
+    Potential candidates for making hotter
+    https://github.com/ssvb/cpuburn-arm -- ASM busyloops & JPEG decoding
+  */
+
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -25,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<String> resultList = new ArrayList();
     ArrayAdapter resultAdapter;
     private Stack tasks = new Stack();
+    private HotThreadPoolExecutor executor = new HotThreadPoolExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     public void onClickMain(View view) {
         TextView stv = (TextView) findViewById(R.id.statusTextView);
         BurnTask task = new BurnTask();
-        task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,tasks.size());
+        task.executeOnExecutor(executor,tasks.size());
         tasks.push(task);
         stv.setText(tasks.size() + " running");
     }
@@ -75,6 +87,8 @@ public class MainActivity extends AppCompatActivity {
                 if(count%100000 == 0) {
                     Log.v("X","Running id " + params[0]);
                     publishProgress(((double)count) / (SystemClock.elapsedRealtime() - startTime));
+                    startTime = SystemClock.elapsedRealtime();
+                    count = 0;
                 }
             }
             return null;
