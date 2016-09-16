@@ -54,41 +54,46 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {  onClickMain(view);            }
         });
-
-    // Example of a call to a native method
-    //TextView tv = (TextView) findViewById(R.id.sample_text);
-    //tv.setText(stringFromJNI());
     }
 
     // start a new burner
     public void onClickMain(View view) {
-        TextView stv = (TextView) findViewById(R.id.statusTextView);
+        // Add a new burn task and start executing it
         BurnTask task = new BurnTask();
         task.executeOnExecutor(executor,tasks.size());
+        // clear the result list if no running tasks
+        if (tasks.size() == 0) resultList.clear();
         tasks.push(task);
+        TextView stv = (TextView) findViewById(R.id.statusTextView);
         stv.setText(tasks.size() + " running");
     }
+
     protected class BurnTask extends AsyncTask <Integer, Double, Void> {
         private int taskId;
         @Override
         protected Void doInBackground(Integer... params) {
+            // Endless sqrt() loop
+            // Every 100k cycles, or 1s, whichever is longest: update performance and cancel condition
             taskId = params[0];
             resultList.add(taskId,"");
             Random r = new Random();
             int count = 0;
             long startTime = SystemClock.elapsedRealtime();
+            long interval = 0;
+            double x = Math.sqrt(r.nextDouble());
             while (true) {
+                x = Math.sqrt(r.nextDouble());
+                count++;
+                if (count%100000 > 0) continue;
+                interval = SystemClock.elapsedRealtime() - startTime;
+                if(interval > 1000) {
+                    publishProgress(((double)count) / interval);
+                    startTime = SystemClock.elapsedRealtime();
+                    count = 0;
+                }
                 if(isCancelled()) {
                     Log.v("X","Cancelled");
                     break;
-                }
-                double x = Math.sqrt(r.nextDouble());
-                count+=1;
-                if(count%100000 == 0) {
-                    Log.v("X","Running id " + params[0]);
-                    publishProgress(((double)count) / (SystemClock.elapsedRealtime() - startTime));
-                    startTime = SystemClock.elapsedRealtime();
-                    count = 0;
                 }
             }
             return null;
@@ -99,10 +104,21 @@ public class MainActivity extends AppCompatActivity {
         }
         @Override
         protected void onProgressUpdate(Double... p) {
+            // Give our benchmark to the resultList, then notify the adapter
+            // but for the first result, calculate an average of all the tasks instead
             super.onProgressUpdate(p);
             resultList.set(taskId,""+p[0]);
+            if (taskId==0) {
+                double rAvg = 0;
+                int rSize = resultList.size();
+                for (int i = 0; i < resultList.size(); i++) {
+                    String r = resultList.get(i);
+                    if (r.isEmpty()) continue;
+                    rAvg += Double.parseDouble(r);
+                }
+                resultList.set(taskId,""+rAvg);
+            }
             resultAdapter.notifyDataSetChanged();
-
         }
     }
     public boolean onClickCancelAll() {
